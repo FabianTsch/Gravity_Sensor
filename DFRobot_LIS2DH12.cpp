@@ -12,105 +12,46 @@
  */
 
 #include <DFRobot_LIS2DH12.h>
-#include <Wire.h>
+#include "mbed.h"
 
-uint8_t DFRobot_LIS2DH12::sensorAddress = 0x18; //	0x18
+uint8_t DFRobot_LIS2DH12::getSensorAdresse(){return sensorAddress;}
 
-int8_t DFRobot_LIS2DH12::init(uint8_t range)
-{
-    int8_t ret = 0;
-    
-    setRange(range);
-    Wire.beginTransmission(sensorAddress);
-    ret = Wire.endTransmission();
-    if(ret != 0){
-       ret = -1;
-    }else{
-        uint8_t ctrl_reg_values[] = {0x2F, 0x00, 0x00, range, 0x00, 0x00};
-        ret = (int8_t)writeReg(0xA0, ctrl_reg_values, sizeof(ctrl_reg_values));
-    }
-    return ret;
+int8_t DFRobot_LIS2DH12::init(uint8_t range){
+    uint8_t regAdresse;
+    int ack;
+    char data[7];
+    setRange(LIS2DH12_RANGE_2GA	0x00);
+
+    uint8_t ctrl_reg_values[] = {0x2F, 0x00, 0x00, range, 0x00, 0x00};
+    regAdresse = 0x80 | 0x20;
+    data[0] = regAdresse;
+    for(uint8_t i = 0; i < sizeof(ctrl_reg_values); ++i)
+      data[i+1] = ctrl_reg_values[i];
+    ack = i2c.write(sensorAddress, data, sizeof(data));
+
+    return ack;
 }
 
-void DFRobot_LIS2DH12::readXYZ(int16_t &x, int16_t &y, int16_t &z) //read x, y, z data
-{
+void DFRobot_LIS2DH12::readXYZ(int16_t &x, int16_t &y, int16_t &z) {
+    //read x, y, z data
+    char data[1];
+    data[0] = 0x80 | 0x28;
     uint8_t sensorData[6];
-    readReg(0xA8, sensorData, 6);
-    x = ((int8_t)sensorData[1])*256+sensorData[0]; //return values
-    y = ((int8_t)sensorData[3])*256+sensorData[2];
-    z = ((int8_t)sensorData[5])*256+sensorData[4];
+    i2c.write(sensorAddress, data, 1, true);
+    i2c.read(sensorAddress, (char*)sensorData, sizeof(sensorData));
+
+    x = ((int8_t) sensorData[1])*256+sensorData[0];
+    y = ((int8_t) sensorData[3])*256+sensorData[2];
+    z = ((int8_t) sensorData[5])*256+sensorData[4];
 }
 
-void DFRobot_LIS2DH12::mgScale(int16_t &x, int16_t &y, int16_t &z)
-{
+void DFRobot_LIS2DH12::mgScale(int16_t &x, int16_t &y, int16_t &z){
     x = (int32_t)x*1000/(1024*mgScaleVel); //transform data to millig, for 2g scale axis*1000/(1024*16),
     y = (int32_t)y*1000/(1024*mgScaleVel); //for 4g scale axis*1000/(1024*8),
     z = (int32_t)z*1000/(1024*mgScaleVel); //for 8g scale axis*1000/(1024*4)
 }
 
-uint8_t DFRobot_LIS2DH12::readReg(uint8_t regAddress)
-{
-    uint8_t regValue;
-    Wire.beginTransmission(sensorAddress);
-    Wire.write(regAddress);
-    Wire.endTransmission();
-    Wire.requestFrom(sensorAddress, (uint8_t)1);
-    regValue = Wire.read();
-    return regValue;
-}
-
-void DFRobot_LIS2DH12::readReg(uint8_t regAddress, uint8_t *regValue, uint8_t quanity, bool autoIncrement)
-{   
-    regAddress = 0x80 | regAddress;
-    if(autoIncrement){
-        Wire.beginTransmission(sensorAddress);
-        Wire.write(regAddress);
-        Wire.endTransmission();
-        Wire.requestFrom(sensorAddress, quanity);
-        for(uint8_t i=0; i < quanity; i++)
-            regValue[i] = Wire.read();
-    }else{
-        for(uint8_t i = 0; i < quanity; i++){
-            Wire.beginTransmission(sensorAddress);
-            Wire.write(regAddress+i);
-            Wire.endTransmission();
-            Wire.requestFrom(sensorAddress,(uint8_t)1);
-            regValue[i] = Wire.read();
-        }
-    }
-    
-}
-
-uint8_t DFRobot_LIS2DH12::writeReg(uint8_t regAddress, uint8_t regValue)
-{
-    Wire.beginTransmission(sensorAddress);
-    Wire.write(regAddress);
-    Wire.write(regValue);
-    return Wire.endTransmission(true);
-}
-
-uint8_t DFRobot_LIS2DH12::writeReg(uint8_t regAddress, uint8_t *regValue, size_t quanity, bool autoIncrement)
-{   
-    Wire.beginTransmission(sensorAddress);
-    if(autoIncrement) {
-        Wire.write(regAddress);
-        Wire.write(regValue, quanity);
-    }
-    else {
-        for(size_t i = 0; i < quanity; i++){
-            Wire.write(regAddress+i);
-            Wire.write(regValue[i]);
-            if( i<(quanity-1) ){
-                Wire.endTransmission(false);
-                Wire.beginTransmission(sensorAddress);
-            }
-        }
-    }
-    return Wire.endTransmission(true);
-}
-
-void DFRobot_LIS2DH12::setRange(uint8_t range)
-{
+void DFRobot_LIS2DH12::setRange(uint8_t range){
     switch(range)
     {
     case LIS2DH12_RANGE_2GA:
@@ -134,3 +75,34 @@ void DFRobot_LIS2DH12::setRange(uint8_t range)
         break;
     }
 }
+
+/*
+void DFRobot_LIS2DH12::readReg(uint8_t regAddress, uint8_t *regValue, uint8_t quanity, bool autoIncrement){
+    regAddress = 0x80 | regAddress;
+    if(autoIncrement){
+        return i2c.read(regAddress, regValue, 1, true);
+// i stoped here
+    }else{
+        for(uint8_t i = 0; i < quanity; i++){
+            Wire.beginTransmission(sensorAddress);
+            Wire.write(regAddress+i);
+            Wire.endTransmission();
+            Wire.requestFrom(sensorAddress,(uint8_t)1);
+            regValue[i] = Wire.read();
+        }
+    }
+
+}
+
+uint8_t DFRobot_LIS2DH12::writeReg(uint8_t regAddress, uint8_t *regValue, size_t quanity, bool autoIncrement = false){
+    if(autoIncrement) {
+      return i2c.write(sensorAddress, regValue, 1, true);
+    }
+    else {
+        for(size_t i = 0; i < quanity; i++){
+            if(!i2c.write(regAddress+i,regValue[i],1))
+              return -1;
+    }
+    return 0;
+}
+*/
