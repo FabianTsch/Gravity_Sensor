@@ -1,16 +1,15 @@
-
 #include "mbed.h"
 #include <DFRobot_LIS2DH12.h>
 
+// Global Variabless
 Serial pc(USBTX, USBRX);
+DFRobot_LIS2DH12 LIS(0x18<<1);
 I2C i2c(p9,p10);
-DFRobot_LIS2DH12 LIS(0x18<<1); //Accelerometer
-
 
 int main(){
 
   // init loop
-  while(LIS.init(LIS2DH12_RANGE_2GA) != 0){
+  while(LIS.init(LIS2DH12_RANGE_2GA,i2c) != 0){
     pc.printf("No I2C devices found\n\r");
     wait_ms(1000);
   }
@@ -23,7 +22,7 @@ int main(){
     LIS.mgScale(x, y, z);
     pc.printf("Acceleration x: %d ",x); //print acceleration
     pc.printf(" mg \ty: %d ",y);
-    pc.printf(" mg \tz: %z ",z);
+    pc.printf(" mg \tz: %d ",z);
     pc.printf(" mg");
   }
 }

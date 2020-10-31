@@ -12,15 +12,17 @@
  */
 
 #include <DFRobot_LIS2DH12.h>
-#include "mbed.h"
+
 
 uint8_t DFRobot_LIS2DH12::getSensorAdresse(){return sensorAddress;}
 
-int8_t DFRobot_LIS2DH12::init(uint8_t range){
+int8_t DFRobot_LIS2DH12::init(uint8_t range, I2C& i2c){
     uint8_t regAdresse;
     int ack;
     char data[7];
-    setRange(LIS2DH12_RANGE_2GA	0x00);
+    setRange(LIS2DH12_RANGE_2GA);
+    i2c_bus = &i2c;
+
 
     uint8_t ctrl_reg_values[] = {0x2F, 0x00, 0x00, range, 0x00, 0x00};
     regAdresse = 0x80 | 0x20;
@@ -37,8 +39,8 @@ void DFRobot_LIS2DH12::readXYZ(int16_t &x, int16_t &y, int16_t &z) {
     char data[1];
     data[0] = 0x80 | 0x28;
     uint8_t sensorData[6];
-    i2c.write(sensorAddress, data, 1, true);
-    i2c.read(sensorAddress, (char*)sensorData, sizeof(sensorData));
+    i2c_bus->write(sensorAddress, data, 1, true);
+    i2c_bus->read(sensorAddress, (char*)sensorData, sizeof(sensorData));
 
     x = ((int8_t) sensorData[1])*256+sensorData[0];
     y = ((int8_t) sensorData[3])*256+sensorData[2];
@@ -76,33 +78,34 @@ void DFRobot_LIS2DH12::setRange(uint8_t range){
     }
 }
 
-/*
-void DFRobot_LIS2DH12::readReg(uint8_t regAddress, uint8_t *regValue, uint8_t quanity, bool autoIncrement){
-    regAddress = 0x80 | regAddress;
+
+uint8_t DFRobot_LIS2DH12::readReg(uint8_t regAddress, char *regValue, uint8_t quantity, bool autoIncrement = true){
+    int ack;
     if(autoIncrement){
-        return i2c.read(regAddress, regValue, 1, true);
-// i stoped here
-    }else{
-        for(uint8_t i = 0; i < quanity; i++){
-            Wire.beginTransmission(sensorAddress);
-            Wire.write(regAddress+i);
-            Wire.endTransmission();
-            Wire.requestFrom(sensorAddress,(uint8_t)1);
-            regValue[i] = Wire.read();
-        }
+    	char data[1];
+	    data[0] = 0x80 | regAddress;
+	    i2c_bus->write(sensorAddress, data, 1, true);
+	    ack = i2c_bus->read(sensorAddress, regValue, sizeof(regValue));
+	    return ack;
     }
-
+    else{
+    	ack = -1;
+    	return ack;
+    }
 }
 
-uint8_t DFRobot_LIS2DH12::writeReg(uint8_t regAddress, uint8_t *regValue, size_t quanity, bool autoIncrement = false){
-    if(autoIncrement) {
-      return i2c.write(sensorAddress, regValue, 1, true);
+uint8_t DFRobot_LIS2DH12::writeReg(uint8_t regAddress, char *regValue, size_t quantity, bool autoIncrement = true){
+    int ack;
+    if(autoIncrement){
+    	char data[7] = {0};
+    	data[0] = 0x80 | regAddress;
+    	for(uint8_t i = 0; i < quantity; ++i)
+      	data[i+1] = regValue[i];
+    	ack = i2c_bus->write(sensorAddress, data, sizeof(data));
+    	return ack;
     }
-    else {
-        for(size_t i = 0; i < quanity; i++){
-            if(!i2c.write(regAddress+i,regValue[i],1))
-              return -1;
+    else{
+    	ack = -1;
+    	return ack;
     }
-    return 0;
 }
-*/
